@@ -1,4 +1,5 @@
-<html>
+<!DOCTYPE html>
+<html lang="da">
     <head>
         <style>
             body {
@@ -7,8 +8,8 @@
                 text-align: center;
                 line-height: 1.5;
                 padding: 5vh;
-
             }
+
             .normal {
                 font-size: 3em;
             }
@@ -16,32 +17,48 @@
             .larger {
                 font-size: 9em;
             }
+
+            .footer {
+                position: absolute;
+                right: 5vh;
+                bottom: 10vh;
+                font-size: 2em;
+            }
+
+            .footer a {
+                color: #eee;
+            }
         </style>
     </head>
     <body>
         <div class="normal">Lige nu (<span id="time"></span>) stammer</div>
         <div class="larger"><span id="gasPercentage"></span> %</div>
         <div class="normal">eller <span id="gasTotal"></span> MW ud af <span id="total"></span> MW af Danmarks strømproduktion fra naturgas.</div>
+        <div class="footer">Flere tal: <a href="https://grønstrøm.nu">grønstrøm.nu</a></div>
     </body>
     <script>
-        fetch("https://api.energidataservice.dk/dataset/ElectricityBalanceNonv?limit=2")
-            .then(data => data.json())
-            .then(data => {
-                const records = data.records;
-                console.log(records);
-                const sources = ["Biomass", "FossilGas", "FossilHardCoal", "FossilOil", "HydroPower", "OtherRenewable", "SolarPower", "Waste", "OnshoreWindPower", "OffshoreWindPower"];
-                const total = sources.reduce((total, source) => total + records[0][source] + records[1][source], 0);
-                console.log(total);
-                const gasTotal = records[0]["FossilGas"] + records[1]["FossilGas"];
-                console.log(gasTotal);
-                const gasPercentage = gasTotal / total * 100;
-                const time = records[0]["HourDK"];
-                console.log(gasPercentage);
-                
-                document.getElementById("time").innerHTML = time.replace("T", " ");
-                document.getElementById("gasPercentage").innerHTML = gasPercentage.toFixed(2).replace(".", ",");
-                document.getElementById("gasTotal").innerHTML = gasTotal.toFixed(2).replace(".", ",");
-                document.getElementById("total").innerHTML = total.toFixed(2).replace(".", ",");
-            })
+        async function populateData(url) {
+            const response = await fetch(url);
+            const data = await response.json();
+            const records = data.records;
+            const sources = ["Biomass", "FossilGas", "FossilHardCoal", "FossilOil", "HydroPower", "OtherRenewable", "SolarPower", "Waste", "OnshoreWindPower", "OffshoreWindPower"];
+            const total = sources.reduce((total, source) => total + records[0][source] + records[1][source], 0);
+            // When the data is in its broken state, the total will come out as 0 MW.
+            if (total === 0) return false;
+            const gasTotal = records[0]["FossilGas"] + records[1]["FossilGas"];
+            const gasPercentage = gasTotal / total * 100;
+            const time = records[0]["HourDK"];
+            
+            document.getElementById("time").innerHTML = time.replace("T", " ");
+            document.getElementById("gasPercentage").innerHTML = gasPercentage.toFixed(2).replace(".", ",");
+            document.getElementById("gasTotal").innerHTML = gasTotal.toFixed(2).replace(".", ",");
+            document.getElementById("total").innerHTML = total.toFixed(2).replace(".", ",");
+            return true;
+        }
+
+        // Usually the first two records in the data can be used, but when they're updated, they
+        // tend to be pretty broken, so then we take the next two instead.
+        const baseUrl = "https://api.energidataservice.dk/dataset/ElectricityBalanceNonv?limit=2";
+        populateData(baseUrl).then(ok => { if (!ok) populateData(baseUrl + "&offset=2") });
     </script>
 </html>
